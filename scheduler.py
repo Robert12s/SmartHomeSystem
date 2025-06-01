@@ -1,5 +1,5 @@
-from datetime import datetime, time
-import time as tm
+from datetime import datetime
+from models import Light, Thermostat, Alarm  # Add this import
 
 
 class Scheduler:
