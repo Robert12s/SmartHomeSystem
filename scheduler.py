@@ -27,5 +27,11 @@ class Scheduler:
         return cursor.fetchall() if cursor else []
 
     def runTasks(self):
-        # Implementation would go here
+        tasks = self.getTasks()
+        for task in tasks:
+            device = task.device
+            if "on" in task.name.lower():
+                device.turnOn()
+            else:
+                device.turnOff()
         pass

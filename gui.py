@@ -140,11 +140,39 @@ class SmartHomeGUI:
             messagebox.showerror("Error", "Failed to add device")
 
     def refreshDeviceList(self):
-        # [Same device list refresh as before]
-        pass
+        # Clear existing items
+        for item in self.device_tree.get_children():
+            self.device_tree.delete(item)
+
+        # Add devices from database
+        devices = self.device_service.getAllDevices()
+        for device in devices:
+            self.device_tree.insert("", "end", values=(
+                device.getName(),
+                device.getLocation(),
+                "On" if device.getStatus() else "Off"
+            ))
+
+    pass
 
     def toggle_device(self, turn_on: bool):
-        # [Same device toggle as before]
+        selected_item = self.device_tree.focus()
+        if not selected_item:
+            messagebox.showerror("Error", "No device selected")
+            return
+
+        device_name = self.device_tree.item(selected_item)['values'][0]
+        devices = self.device_service.getAllDevices()
+
+        for device in devices:
+            if device.getName() == device_name:
+                if turn_on:
+                    device.turnOn()
+                else:
+                    device.turnOff()
+                break
+
+        self.refresh_device_list()
         pass
 
 
