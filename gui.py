@@ -84,8 +84,43 @@ class SmartHomeGUI:
         self.refreshDeviceList()
 
     def createWidgets(self):
-        # [Same GUI implementation as before]
-        # ...
+        # Main frame
+        self.main_frame = ttk.Frame(self.root, padding="10")
+        self.main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+
+        # Device list
+        self.device_list = ttk.Treeview(self.main_frame, columns=('name', 'location', 'status'), show='headings')
+        self.device_list.heading('name', text='Name')
+        self.device_list.heading('location', text='Location')
+        self.device_list.heading('status', text='Status')
+        self.device_list.grid(row=0, column=0, columnspan=3, pady=10)
+
+        # Add device controls
+        ttk.Label(self.main_frame, text="Add New Device:").grid(row=1, column=0, sticky=tk.W)
+
+        self.device_type_var = tk.StringVar()
+        self.device_type_combo = ttk.Combobox(self.main_frame, textvariable=self.device_type_var,
+                                              values=["Light", "Thermostat", "Alarm"])
+        self.device_type_combo.grid(row=2, column=0, padx=5, pady=5)
+
+        ttk.Label(self.main_frame, text="Name:").grid(row=2, column=1, sticky=tk.E)
+        self.device_name_var = tk.StringVar()
+        ttk.Entry(self.main_frame, textvariable=self.device_name_var).grid(row=2, column=2, padx=5, pady=5)
+
+        ttk.Label(self.main_frame, text="Location:").grid(row=3, column=1, sticky=tk.E)
+        self.device_location_var = tk.StringVar()
+        ttk.Entry(self.main_frame, textvariable=self.device_location_var).grid(row=3, column=2, padx=5, pady=5)
+
+        ttk.Button(self.main_frame, text="Add Device", command=self.add_device).grid(row=4, column=2, pady=10)
+
+        # Control buttons
+        self.control_frame = ttk.Frame(self.main_frame)
+        self.control_frame.grid(row=5, column=0, columnspan=3)
+
+        ttk.Button(self.control_frame, text="Turn On", command=lambda: self.toggle_device(True)).grid(row=0, column=0,
+                                                                                                      padx=5)
+        ttk.Button(self.control_frame, text="Turn Off", command=lambda: self.toggle_device(False)).grid(row=0, column=1,
+                                                                                                        padx=5)
         pass
 
     def add_device(self):
