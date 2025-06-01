@@ -5,49 +5,37 @@ from database import Database
 from models import Light, Thermostat, Alarm
 from scheduler import Scheduler
 
-
 class DeviceManager:
     def __init__(self, db):
         self.db = db
 
     def addDevice(self, name, deviceType, location):
-        query = "INSERT INTO devices (name, type, location) VALUES (?,?,?)"
-        c = self.db.execute(query, (name, deviceType, location))
-        return c.lastrowid if c else None
+        query = "INSERT INTO devices (name, type, location) VALUES (?, ?, ?)"
+        cursor = self.db.execute(query, (name, deviceType, location))
+        return cursor.lastrowid if cursor else None
 
     def getDeviceById(self, deviceId):
-        c = self.db.execute("SELECT * FROM devices WHERE id=?", (deviceId,))
-        row = c.fetchone() if c else None
+        cursor = self.db.execute("SELECT * FROM devices WHERE id=?", (deviceId,))
+        row = cursor.fetchone() if cursor else None
         if not row:
             return None
 
-        # Ensure we have all 9 columns, filling missing ones with defaults
-        row = list(row)
-        while len(row) < 9:  # Add missing columns with default values
-            row.append(None)
-
-        id, name, type, loc, status, bright, temp, armed, voltage = row
-
-        # Provide defaults for None values
-        bright = 50 if bright is None else bright
-        temp = 22.0 if temp is None else temp
-        armed = False if armed is None else armed
-        voltage = 0 if voltage is None else voltage
-
+        id, name, type, loc, status, brightness, temp, armed, voltage = row
         if type == "Light":
-            return Light(id, name, loc, status, bright)
+            return Light(id, name, loc, status, brightness or 50)
         elif type == "Thermostat":
-            return Thermostat(id, name, loc, status, temp)
+            return Thermostat(id, name, loc, status, temp or 22.0)
         elif type == "Alarm":
-            return Alarm(id, name, loc, status, armed)
+            return Alarm(id, name, loc, status, armed or False)
         return None
 
     def getAllDevices(self):
         devices = []
-        c = self.db.execute("SELECT * FROM devices")
-        for row in c.fetchall():
-            id = row[0]
-            devices.append(self.getDeviceById(id))
+        cursor = self.db.execute("SELECT * FROM devices")
+        for row in cursor.fetchall():
+            device = self.getDeviceById(row[0])
+            if device:
+                devices.append(device)
         return devices
 
     def updateDevice(self, device):
@@ -69,7 +57,7 @@ class SmartHomeGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("Smart Home System")
-        self.root.geometry("900x700")
+        self.root.geometry("1000x700")
 
         self.db = Database()
         self.deviceManager = DeviceManager(self.db)
@@ -83,16 +71,41 @@ class SmartHomeGUI:
         mainFrame = ttk.Frame(self.root, padding=10)
         mainFrame.pack(fill=tk.BOTH, expand=True)
 
-        # Device List (Left Panel)
+        # Left Panel - Devices
         leftPanel = ttk.Frame(mainFrame)
         leftPanel.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        self.tree = ttk.Treeview(leftPanel, columns=('type', 'location', 'status', 'energy'))
+        # Energy Monitoring (at the top)
+        energyFrame = ttk.LabelFrame(leftPanel, text="Energy Monitoring", padding=10)
+        energyFrame.pack(fill=tk.X, pady=5)
+
+        self.energyLabel = ttk.Label(energyFrame, text="Total Energy Usage: 0.00 kWh")
+        self.energyLabel.pack()
+
+        # Scrollable Device Tree
+        treeFrame = ttk.Frame(leftPanel)
+        treeFrame.pack(fill=tk.BOTH, expand=True)
+
+        treeScroll = ttk.Scrollbar(treeFrame)
+        treeScroll.pack(side=tk.RIGHT, fill=tk.Y)
+
+        self.tree = ttk.Treeview(treeFrame, columns=('type', 'location', 'status', 'value', 'energy'),
+                                 yscrollcommand=treeScroll.set, height=12)
+        treeScroll.config(command=self.tree.yview)
+
         self.tree.heading('#0', text='Name')
         self.tree.heading('type', text='Type')
         self.tree.heading('location', text='Location')
         self.tree.heading('status', text='Status')
-        self.tree.heading('energy', text='Energy Usage')
+        self.tree.heading('value', text='Value')
+        self.tree.heading('energy', text='Energy (kWh)')
+
+        self.tree.column('#0', width=120)
+        self.tree.column('type', width=80)
+        self.tree.column('location', width=100)
+        self.tree.column('status', width=60)
+        self.tree.column('value', width=80)
+        self.tree.column('energy', width=80)
         self.tree.pack(fill=tk.BOTH, expand=True)
 
         # Device Controls
@@ -103,33 +116,34 @@ class SmartHomeGUI:
         ttk.Button(controlFrame, text="Turn Off", command=lambda: self.setDeviceStatus(False)).pack(side=tk.LEFT)
 
         # Add Device Panel
-        addFrame = ttk.LabelFrame(leftPanel, text="Add New Device")
+        addFrame = ttk.LabelFrame(leftPanel, text="Add New Device", padding=10)
         addFrame.pack(fill=tk.X, pady=5)
 
-        ttk.Label(addFrame, text="Type:").grid(row=0, column=0, padx=5, pady=5)
+        ttk.Label(addFrame, text="Type:").grid(row=0, column=0, padx=5, pady=5, sticky=tk.W)
         self.deviceType = ttk.Combobox(addFrame, values=['Light', 'Thermostat', 'Alarm'])
-        self.deviceType.grid(row=0, column=1, padx=5, pady=5)
+        self.deviceType.grid(row=0, column=1, padx=5, pady=5, sticky=tk.EW)
 
-        ttk.Label(addFrame, text="Name:").grid(row=1, column=0, padx=5, pady=5)
+        ttk.Label(addFrame, text="Name:").grid(row=1, column=0, padx=5, pady=5, sticky=tk.W)
         self.deviceName = ttk.Entry(addFrame)
-        self.deviceName.grid(row=1, column=1, padx=5, pady=5)
+        self.deviceName.grid(row=1, column=1, padx=5, pady=5, sticky=tk.EW)
 
-        ttk.Label(addFrame, text="Location:").grid(row=2, column=0, padx=5, pady=5)
+        ttk.Label(addFrame, text="Location:").grid(row=2, column=0, padx=5, pady=5, sticky=tk.W)
         self.deviceLocation = ttk.Entry(addFrame)
-        self.deviceLocation.grid(row=2, column=1, padx=5, pady=5)
+        self.deviceLocation.grid(row=2, column=1, padx=5, pady=5, sticky=tk.EW)
 
-        ttk.Button(addFrame, text="Add Device", command=self.addDevice).grid(row=3, column=1, pady=5)
+        ttk.Button(addFrame, text="Add Device", command=self.addDevice).grid(row=3, column=1, pady=5, sticky=tk.E)
 
-        # Task Scheduling (Right Panel)
+        # Right Panel - Scheduling
         rightPanel = ttk.Frame(mainFrame)
-        rightPanel.pack(side=tk.RIGHT, fill=tk.BOTH, padx=10)
+        rightPanel.pack(side=tk.RIGHT, fill=tk.BOTH, padx=10, expand=True)
 
+        # Schedule New Task
         taskFrame = ttk.LabelFrame(rightPanel, text="Schedule Task", padding=10)
-        taskFrame.pack(fill=tk.BOTH, pady=5)
+        taskFrame.pack(fill=tk.X, pady=5)
 
         ttk.Label(taskFrame, text="Device:").grid(row=0, column=0, sticky=tk.W, pady=2)
         self.taskDevice = ttk.Combobox(taskFrame)
-        self.taskDevice.grid(row=0, column=1, pady=2)
+        self.taskDevice.grid(row=0, column=1, pady=2, sticky=tk.EW)
 
         ttk.Label(taskFrame, text="Action:").grid(row=1, column=0, sticky=tk.W, pady=2)
         self.taskAction = ttk.Combobox(taskFrame, values=[
@@ -138,19 +152,20 @@ class SmartHomeGUI:
             "Set Temperature 20", "Set Temperature 25",
             "Arm", "Disarm"
         ])
-        self.taskAction.grid(row=1, column=1, pady=2)
+        self.taskAction.grid(row=1, column=1, pady=2, sticky=tk.EW)
 
         ttk.Label(taskFrame, text="Time (HH:MM):").grid(row=2, column=0, sticky=tk.W, pady=2)
         self.taskTime = ttk.Entry(taskFrame)
-        self.taskTime.grid(row=2, column=1, pady=2)
+        self.taskTime.grid(row=2, column=1, pady=2, sticky=tk.EW)
 
         self.taskRepeat = tk.BooleanVar()
         ttk.Checkbutton(taskFrame, text="Repeat Daily", variable=self.taskRepeat).grid(row=3, column=1, sticky=tk.W,
                                                                                        pady=2)
 
-        ttk.Button(taskFrame, text="Schedule Task", command=self.scheduleTask).grid(row=4, column=1, pady=5)
+        ttk.Button(taskFrame, text="Schedule Task", command=self.scheduleTask).grid(row=4, column=1, pady=5,
+                                                                                    sticky=tk.E)
 
-        # Task List
+        # Scheduled Tasks List
         taskListFrame = ttk.LabelFrame(rightPanel, text="Scheduled Tasks", padding=10)
         taskListFrame.pack(fill=tk.BOTH, expand=True)
 
@@ -159,14 +174,12 @@ class SmartHomeGUI:
         self.taskTree.heading('action', text='Action')
         self.taskTree.heading('time', text='Time')
         self.taskTree.heading('repeat', text='Repeats')
+
+        self.taskTree.column('#0', width=120)
+        self.taskTree.column('action', width=100)
+        self.taskTree.column('time', width=80)
+        self.taskTree.column('repeat', width=60)
         self.taskTree.pack(fill=tk.BOTH, expand=True)
-
-        # Energy Monitoring
-        energyFrame = ttk.LabelFrame(leftPanel, text="Energy Monitoring", padding=10)
-        energyFrame.pack(fill=tk.X, pady=5)
-
-        self.energyLabel = ttk.Label(energyFrame, text="Total Energy Usage: 0 kWh")
-        self.energyLabel.pack()
 
     def loadDevices(self):
         for item in self.tree.get_children():
@@ -177,23 +190,33 @@ class SmartHomeGUI:
 
         devices = self.deviceManager.getAllDevices()
         deviceNames = []
+        totalEnergy = 0.0
 
-        totalEnergy = 0
         for device in devices:
             if device:
                 status = "On" if device.status else "Off"
                 energy = device.getEnergyUsage()
                 totalEnergy += energy
 
+                # Set value based on device type
+                value = "-"
+                if isinstance(device, Light):
+                    value = f"{device.brightness}%"
+                elif isinstance(device, Thermostat):
+                    value = f"{device.temperature}°C"
+                elif isinstance(device, Alarm):
+                    value = "Armed" if device.armed else "Disarmed"
+
                 self.tree.insert('', 'end', text=device.name,
                                  values=(device.type, device.location,
-                                         status, f"{energy:.2f} kWh"))
+                                         status, value, f"{energy:.2f}"))
                 deviceNames.append(device.name)
 
-        self.taskDevice['values'] = deviceNames
+        # Update energy monitoring
         self.energyLabel.config(text=f"Total Energy Usage: {totalEnergy:.2f} kWh")
+        self.taskDevice['values'] = deviceNames
 
-        # Load tasks
+        # Load scheduled tasks
         tasks = self.scheduler.getTasks()
         for task in tasks:
             device = self.deviceManager.getDeviceById(task[1])
@@ -257,6 +280,7 @@ class SmartHomeGUI:
 
         if device and self.scheduler.addTask(device.id, action, taskTime, repeat):
             self.loadDevices()
+            self.taskTime.delete(0, tk.END)
             messagebox.showinfo("Success", "Task scheduled successfully")
         else:
             messagebox.showerror("Error", "Failed to schedule task")

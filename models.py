@@ -28,7 +28,7 @@ class Light(Device):
     def setBrightness(self, value):
         self.brightness = max(0, min(100, value))
         self.voltage = 5 + (self.brightness * 0.1)  # Brighter = more energy
-
+        print(f"Brightness set to {self.brightness}")
 
 class Thermostat(Device):
     def __init__(self, id, name, location, status=False, temperature=22.0):
@@ -39,7 +39,7 @@ class Thermostat(Device):
     def setTemperature(self, value):
         self.temperature = max(10.0, min(30.0, value))
         self.voltage = 15 + abs(22 - self.temperature)  # More energy when heating/cooling
-
+        print(f"Temperature set to {self.temperature}")
 
 class Alarm(Device):
     def __init__(self, id, name, location, status=False, armed=False):
@@ -50,10 +50,12 @@ class Alarm(Device):
     def arm(self):
         self.armed = True
         self.voltage = 2  # Small constant power when armed
+        print("Alarm armed")
 
     def disarm(self):
         self.armed = False
         self.voltage = 0
+        print("Alarm disarmed")
 
 class Task:
     def __init__(self, id, deviceId, action, time, repeat=False):
