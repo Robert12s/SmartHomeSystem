@@ -1,37 +1,15 @@
-from database import Database
-from models import Task
-
-
 class Scheduler:
-    def __init__(self, db: Database):
+    def __init__(self, db):
         self.db = db
 
-    def addTask(self, task: Task) -> bool:
-        query = '''
-            INSERT INTO tasks (name, location, time, repeat, deviceId)
-            VALUES (?, ?, ?, ?, ?)
-        '''
-        params = (
-            task.name,
-            task.location,
-            task.time,
-            task.repeat,
-            task.device.id
-        )
-        cursor = self.db.executeQuery(query, params)
-        return cursor is not None
+    def addTask(self, deviceId, action, time, repeat=False):
+        query = "INSERT INTO tasks (deviceId, action, time, repeat) VALUES (?,?,?,?)"
+        return self.db.execute(query, (deviceId, action, time, repeat))
 
-    def getTasks(self) -> list:
-        query = "SELECT * FROM tasks"
-        cursor = self.db.executeQuery(query)
-        return cursor.fetchall() if cursor else []
-
-    def runTasks(self):
-        tasks = self.getTasks()
-        for task in tasks:
-            device = task.device
-            if "on" in task.name.lower():
-                device.turnOn()
-            else:
-                device.turnOff()
-        pass
+    def getTasks(self):
+        tasks = []
+        c = self.db.execute("SELECT * FROM tasks")
+        if c:
+            for task in c.fetchall():
+                tasks.append(task)
+        return tasks

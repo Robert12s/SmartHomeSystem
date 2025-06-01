@@ -1,189 +1,69 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
-from models import Light, Thermostat, Alarm
-from database import Database
-from scheduler import Scheduler
-
-
-class SmartHomeSystem:
-    def __init__(self, db: Database):
-        self.db = db
-        self.scheduler = Scheduler(db)
-
-    def addDevice(self, name: str, location: str, device_type: str, **kwargs):
-        query = '''
-            INSERT INTO devices 
-            (name, location, status, voltage, brightness, temperature, armed)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        '''
-
-        if device_type == "Light":
-            brightness = kwargs.get('brightness', 50)
-            params = (name, location, False, 0.0, brightness, None, None)
-            device = Light(0, name, location, False, 0.0, brightness)
-        elif device_type == "Thermostat":
-            temperature = kwargs.get('temperature', 22.0)
-            params = (name, location, False, 0.0, None, temperature, None)
-            device = Thermostat(0, name, location, False, 0.0, temperature)
-        elif device_type == "Alarm":
-            armed = kwargs.get('armed', False)
-            params = (name, location, False, 0.0, None, None, armed)
-            device = Alarm(0, name, location, False, 0.0, armed)
-
-        if device:
-            cursor = self.db.executeQuery(query, params)
-            if cursor:
-                device.id = cursor.lastrowid
-                return device
-        return None
-
-    def getDeviceById(self, id: int):
-        query = "SELECT * FROM devices WHERE id = ?"
-        cursor = self.db.executeQuery(query, (id,))
-        if cursor:
-            row = cursor.fetchone()
-            if row:
-                return self._createDeviceFromRow(row)
-        return None
-
-    def getAllDevices(self):
-        query = "SELECT * FROM devices"
-        cursor = self.db.executeQuery(query)
-        devices = []
-        if cursor:
-            for row in cursor.fetchall():
-                device = self._createDeviceFromRow(row)
-                if device:
-                    devices.append(device)
-        return devices
-
-    def _createDeviceFromRow(self, row: tuple):
-        (id, name, location, status, voltage,
-         brightness, temperature, armed) = row
-
-        if brightness is not None:
-            return Light(id, name, location, status, voltage, brightness)
-        elif temperature is not None:
-            return Thermostat(id, name, location, status, voltage, temperature)
-        elif armed is not None:
-            return Alarm(id, name, location, status, voltage, armed)
-        return None
 
 
 class SmartHomeGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("Smart Home System")
-        self.root.geometry("800x600")  # Set a reasonable window size
 
-        # Initialize database and system
+        # Setup database and services
         self.db = Database()
-        self.system = SmartHomeSystem(self.db)
+        self.scheduler = Scheduler(self.db)
 
-        # Create GUI elements
-        self.createWidgets()
-        self.refreshDeviceList()
+        # Create UI
+        self.setupUI()
+        self.loadDevices()
 
-    def createWidgets(self):
-        # Main frame
-        self.main_frame = ttk.Frame(self.root, padding="20")
-        self.main_frame.pack(fill=tk.BOTH, expand=True)
+    def setupUI(self):
+        # Device List
+        self.deviceTree = ttk.Treeview(self.root, columns=('name', 'location', 'status'))
+        self.deviceTree.heading('#0', text='ID')
+        self.deviceTree.heading('name', text='Name')
+        self.deviceTree.heading('location', text='Location')
+        self.deviceTree.heading('status', text='Status')
+        self.deviceTree.pack(fill=tk.BOTH, expand=True)
 
-        # Device list
-        self.device_list = ttk.Treeview(self.main_frame, columns=('name', 'location', 'status'), show='headings')
-        self.device_list.heading('name', text='Name')
-        self.device_list.heading('location', text='Location')
-        self.device_list.heading('status', text='Status')
-        self.device_list.pack(fill=tk.BOTH, expand=True, pady=10)
+        # Control Buttons
+        btnFrame = ttk.Frame(self.root)
+        btnFrame.pack(fill=tk.X)
 
-        # Add scrollbar
-        scrollbar = ttk.Scrollbar(self.device_list, orient=tk.VERTICAL, command=self.device_list.yview)
-        self.device_list.configure(yscroll=scrollbar.set)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        ttk.Button(btnFrame, text="Turn On", command=lambda: self.setDeviceStatus(True)).pack(side=tk.LEFT)
+        ttk.Button(btnFrame, text="Turn Off", command=lambda: self.setDeviceStatus(False)).pack(side=tk.LEFT)
 
-        # Add device controls frame
-        add_frame = ttk.LabelFrame(self.main_frame, text="Add New Device", padding="10")
-        add_frame.pack(fill=tk.X, pady=10)
+        # Add Device
+        addFrame = ttk.Frame(self.root)
+        addFrame.pack(fill=tk.X)
 
-        # Device type selection
-        ttk.Label(add_frame, text="Type:").grid(row=0, column=0, padx=5, pady=5, sticky=tk.W)
-        self.device_type_var = tk.StringVar()
-        self.device_type_combo = ttk.Combobox(add_frame, textvariable=self.device_type_var,
-                                              values=["Light", "Thermostat", "Alarm"])
-        self.device_type_combo.grid(row=0, column=1, padx=5, pady=5, sticky=tk.EW)
-        self.device_type_combo.current(0)
+        self.deviceType = ttk.Combobox(addFrame, values=['Light', 'Thermostat', 'Alarm'])
+        self.deviceType.pack(side=tk.LEFT)
+        ttk.Button(addFrame, text="Add Device", command=self.addDevice).pack(side=tk.LEFT)
 
-        # Device name
-        ttk.Label(add_frame, text="Name:").grid(row=1, column=0, padx=5, pady=5, sticky=tk.W)
-        self.device_name_var = tk.StringVar()
-        ttk.Entry(add_frame, textvariable=self.device_name_var).grid(row=1, column=1, padx=5, pady=5, sticky=tk.EW)
+    def loadDevices(self):
+        for item in self.deviceTree.get_children():
+            self.deviceTree.delete(item)
 
-        # Device location
-        ttk.Label(add_frame, text="Location:").grid(row=2, column=0, padx=5, pady=5, sticky=tk.W)
-        self.device_location_var = tk.StringVar()
-        ttk.Entry(add_frame, textvariable=self.device_location_var).grid(row=2, column=1, padx=5, pady=5, sticky=tk.EW)
+        c = self.db.execute("SELECT * FROM devices")
+        if c:
+            for device in c.fetchall():
+                self.deviceTree.insert('', 'end', text=device[0], values=device[1:4])
 
-        # Add device button
-        ttk.Button(add_frame, text="Add Device", command=self.add_device).grid(row=3, column=1, pady=10, sticky=tk.E)
-
-        # Control buttons frame
-        control_frame = ttk.Frame(self.main_frame)
-        control_frame.pack(fill=tk.X, pady=10)
-
-        ttk.Button(control_frame, text="Turn On", command=lambda: self.toggle_device(True)).pack(side=tk.LEFT, padx=5)
-        ttk.Button(control_frame, text="Turn Off", command=lambda: self.toggle_device(False)).pack(side=tk.LEFT, padx=5)
-
-        # Configure grid weights
-        add_frame.columnconfigure(1, weight=1)
-
-    def add_device(self):
-        device_type = self.device_type_var.get()
-        name = self.device_name_var.get().strip()
-        location = self.device_location_var.get().strip()
-
-        if not name or not location:
-            messagebox.showerror("Error", "Please enter both name and location")
+    def addDevice(self):
+        deviceType = self.deviceType.get()
+        if not deviceType:
             return
 
-        device = self.system.addDevice(name, location, device_type)
-        if device:
-            messagebox.showinfo("Success", f"{device_type} added successfully")
-            self.device_name_var.set("")
-            self.device_location_var.set("")
-            self.refreshDeviceList()
-        else:
-            messagebox.showerror("Error", "Failed to add device")
+        query = "INSERT INTO devices (name, location, type) VALUES (?,?,?)"
+        if self.db.execute(query, (f"New {deviceType}", "Room", deviceType)):
+            self.loadDevices()
 
-    def refreshDeviceList(self):
-        # Clear existing items
-        for item in self.device_list.get_children():
-            self.device_list.delete(item)
-
-        # Add devices from database
-        devices = self.system.getAllDevices()
-        for device in devices:
-            self.device_list.insert("", "end", values=(
-                device.getName(),
-                device.getLocation(),
-                "On" if device.getStatus() else "Off"
-            ))
-
-    def toggle_device(self, turn_on: bool):
-        selected_item = self.device_list.focus()
-        if not selected_item:
-            messagebox.showerror("Error", "No device selected")
-            return
-
-        device_name = self.device_list.item(selected_item)['values'][0]
-
-        # Update device status in database
-        query = "UPDATE devices SET status = ? WHERE name = ?"
-        params = (turn_on, device_name)
-
-        if self.db.executeQuery(query, params):
-            self.refreshDeviceList()
-        else:
-            messagebox.showerror("Error", "Failed to update device status")
+    def setDeviceStatus(self, status):
+        selected = self.deviceTree.focus()
+        if selected:
+            deviceId = self.deviceTree.item(selected)['text']
+            query = "UPDATE devices SET status=? WHERE id=?"
+            if self.db.execute(query, (status, deviceId)):
+                self.loadDevices()
 
 
 if __name__ == "__main__":
