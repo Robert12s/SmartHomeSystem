@@ -1,3 +1,6 @@
+from datetime import datetime
+
+
 class Scheduler:
     def __init__(self, db):
         self.db = db
@@ -7,9 +10,12 @@ class Scheduler:
         return self.db.execute(query, (deviceId, action, time, repeat))
 
     def getTasks(self):
-        tasks = []
         c = self.db.execute("SELECT * FROM tasks")
-        if c:
-            for task in c.fetchall():
-                tasks.append(task)
-        return tasks
+        return c.fetchall() if c else []
+
+    def runPendingTasks(self):
+        tasks = self.getTasks()
+        current_time = datetime.now().strftime("%H:%M")
+        for task in tasks:
+            if task[3] == current_time:  # task[3] is time
+                print(f"Executing task: {task}")  # Replace with actual device control

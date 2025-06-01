@@ -1,5 +1,8 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
+from database import Database
+from models import Light, Thermostat, Alarm
+from scheduler import Scheduler
 
 
 class SmartHomeGUI:
@@ -7,62 +10,52 @@ class SmartHomeGUI:
         self.root = root
         self.root.title("Smart Home System")
 
-        # Setup database and services
         self.db = Database()
         self.scheduler = Scheduler(self.db)
-
-        # Create UI
         self.setupUI()
         self.loadDevices()
 
     def setupUI(self):
+        mainFrame = ttk.Frame(self.root, padding="10")
+        mainFrame.pack(fill=tk.BOTH, expand=True)
+
         # Device List
-        self.deviceTree = ttk.Treeview(self.root, columns=('name', 'location', 'status'))
-        self.deviceTree.heading('#0', text='ID')
-        self.deviceTree.heading('name', text='Name')
-        self.deviceTree.heading('location', text='Location')
-        self.deviceTree.heading('status', text='Status')
-        self.deviceTree.pack(fill=tk.BOTH, expand=True)
+        self.tree = ttk.Treeview(mainFrame, columns=('type', 'location', 'status'))
+        self.tree.heading('#0', text='Name')
+        self.tree.heading('type', text='Type')
+        self.tree.heading('location', text='Location')
+        self.tree.heading('status', text='Status')
+        self.tree.pack(fill=tk.BOTH, expand=True)
 
         # Control Buttons
-        btnFrame = ttk.Frame(self.root)
-        btnFrame.pack(fill=tk.X)
+        btnFrame = ttk.Frame(mainFrame)
+        btnFrame.pack(fill=tk.X, pady=5)
 
         ttk.Button(btnFrame, text="Turn On", command=lambda: self.setDeviceStatus(True)).pack(side=tk.LEFT)
         ttk.Button(btnFrame, text="Turn Off", command=lambda: self.setDeviceStatus(False)).pack(side=tk.LEFT)
 
-        # Add Device
-        addFrame = ttk.Frame(self.root)
-        addFrame.pack(fill=tk.X)
+        # Task Scheduling
+        taskFrame = ttk.LabelFrame(mainFrame, text="Schedule Task")
+        taskFrame.pack(fill=tk.X, pady=5)
 
-        self.deviceType = ttk.Combobox(addFrame, values=['Light', 'Thermostat', 'Alarm'])
-        self.deviceType.pack(side=tk.LEFT)
-        ttk.Button(addFrame, text="Add Device", command=self.addDevice).pack(side=tk.LEFT)
+        ttk.Button(taskFrame, text="Check Tasks", command=self.scheduler.runPendingTasks).pack()
 
     def loadDevices(self):
-        for item in self.deviceTree.get_children():
-            self.deviceTree.delete(item)
+        for item in self.tree.get_children():
+            self.tree.delete(item)
 
         c = self.db.execute("SELECT * FROM devices")
-        if c:
-            for device in c.fetchall():
-                self.deviceTree.insert('', 'end', text=device[0], values=device[1:4])
-
-    def addDevice(self):
-        deviceType = self.deviceType.get()
-        if not deviceType:
-            return
-
-        query = "INSERT INTO devices (name, location, type) VALUES (?,?,?)"
-        if self.db.execute(query, (f"New {deviceType}", "Room", deviceType)):
-            self.loadDevices()
+        for device in c.fetchall():
+            status = "On" if device[4] else "Off"
+            self.tree.insert('', 'end', text=device[1],
+                             values=(device[2], device[3], status))
 
     def setDeviceStatus(self, status):
-        selected = self.deviceTree.focus()
+        selected = self.tree.focus()
         if selected:
-            deviceId = self.deviceTree.item(selected)['text']
-            query = "UPDATE devices SET status=? WHERE id=?"
-            if self.db.execute(query, (status, deviceId)):
+            device_name = self.tree.item(selected)['text']
+            query = "UPDATE devices SET status=? WHERE name=?"
+            if self.db.execute(query, (status, device_name)):
                 self.loadDevices()
 
 
