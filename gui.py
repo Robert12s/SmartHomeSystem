@@ -74,6 +74,7 @@ class SmartHomeGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("Smart Home System")
+        self.root.geometry("800x600")  # Set a reasonable window size
 
         # Initialize database and system
         self.db = Database()
@@ -85,48 +86,60 @@ class SmartHomeGUI:
 
     def createWidgets(self):
         # Main frame
-        self.main_frame = ttk.Frame(self.root, padding="10")
-        self.main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        self.main_frame = ttk.Frame(self.root, padding="20")
+        self.main_frame.pack(fill=tk.BOTH, expand=True)
 
         # Device list
         self.device_list = ttk.Treeview(self.main_frame, columns=('name', 'location', 'status'), show='headings')
         self.device_list.heading('name', text='Name')
         self.device_list.heading('location', text='Location')
         self.device_list.heading('status', text='Status')
-        self.device_list.grid(row=0, column=0, columnspan=3, pady=10)
+        self.device_list.pack(fill=tk.BOTH, expand=True, pady=10)
 
-        # Add device controls
-        ttk.Label(self.main_frame, text="Add New Device:").grid(row=1, column=0, sticky=tk.W)
+        # Add scrollbar
+        scrollbar = ttk.Scrollbar(self.device_list, orient=tk.VERTICAL, command=self.device_list.yview)
+        self.device_list.configure(yscroll=scrollbar.set)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
+        # Add device controls frame
+        add_frame = ttk.LabelFrame(self.main_frame, text="Add New Device", padding="10")
+        add_frame.pack(fill=tk.X, pady=10)
+
+        # Device type selection
+        ttk.Label(add_frame, text="Type:").grid(row=0, column=0, padx=5, pady=5, sticky=tk.W)
         self.device_type_var = tk.StringVar()
-        self.device_type_combo = ttk.Combobox(self.main_frame, textvariable=self.device_type_var,
+        self.device_type_combo = ttk.Combobox(add_frame, textvariable=self.device_type_var,
                                               values=["Light", "Thermostat", "Alarm"])
-        self.device_type_combo.grid(row=2, column=0, padx=5, pady=5)
+        self.device_type_combo.grid(row=0, column=1, padx=5, pady=5, sticky=tk.EW)
+        self.device_type_combo.current(0)
 
-        ttk.Label(self.main_frame, text="Name:").grid(row=2, column=1, sticky=tk.E)
+        # Device name
+        ttk.Label(add_frame, text="Name:").grid(row=1, column=0, padx=5, pady=5, sticky=tk.W)
         self.device_name_var = tk.StringVar()
-        ttk.Entry(self.main_frame, textvariable=self.device_name_var).grid(row=2, column=2, padx=5, pady=5)
+        ttk.Entry(add_frame, textvariable=self.device_name_var).grid(row=1, column=1, padx=5, pady=5, sticky=tk.EW)
 
-        ttk.Label(self.main_frame, text="Location:").grid(row=3, column=1, sticky=tk.E)
+        # Device location
+        ttk.Label(add_frame, text="Location:").grid(row=2, column=0, padx=5, pady=5, sticky=tk.W)
         self.device_location_var = tk.StringVar()
-        ttk.Entry(self.main_frame, textvariable=self.device_location_var).grid(row=3, column=2, padx=5, pady=5)
+        ttk.Entry(add_frame, textvariable=self.device_location_var).grid(row=2, column=1, padx=5, pady=5, sticky=tk.EW)
 
-        ttk.Button(self.main_frame, text="Add Device", command=self.add_device).grid(row=4, column=2, pady=10)
+        # Add device button
+        ttk.Button(add_frame, text="Add Device", command=self.add_device).grid(row=3, column=1, pady=10, sticky=tk.E)
 
-        # Control buttons
-        self.control_frame = ttk.Frame(self.main_frame)
-        self.control_frame.grid(row=5, column=0, columnspan=3)
+        # Control buttons frame
+        control_frame = ttk.Frame(self.main_frame)
+        control_frame.pack(fill=tk.X, pady=10)
 
-        ttk.Button(self.control_frame, text="Turn On", command=lambda: self.toggle_device(True)).grid(row=0, column=0,
-                                                                                                      padx=5)
-        ttk.Button(self.control_frame, text="Turn Off", command=lambda: self.toggle_device(False)).grid(row=0, column=1,
-                                                                                                        padx=5)
-        pass
+        ttk.Button(control_frame, text="Turn On", command=lambda: self.toggle_device(True)).pack(side=tk.LEFT, padx=5)
+        ttk.Button(control_frame, text="Turn Off", command=lambda: self.toggle_device(False)).pack(side=tk.LEFT, padx=5)
+
+        # Configure grid weights
+        add_frame.columnconfigure(1, weight=1)
 
     def add_device(self):
         device_type = self.device_type_var.get()
-        name = self.device_name_var.get()
-        location = self.device_location_var.get()
+        name = self.device_name_var.get().strip()
+        location = self.device_location_var.get().strip()
 
         if not name or not location:
             messagebox.showerror("Error", "Please enter both name and location")
@@ -135,45 +148,42 @@ class SmartHomeGUI:
         device = self.system.addDevice(name, location, device_type)
         if device:
             messagebox.showinfo("Success", f"{device_type} added successfully")
+            self.device_name_var.set("")
+            self.device_location_var.set("")
             self.refreshDeviceList()
         else:
             messagebox.showerror("Error", "Failed to add device")
 
     def refreshDeviceList(self):
         # Clear existing items
-        for item in self.device_tree.get_children():
-            self.device_tree.delete(item)
+        for item in self.device_list.get_children():
+            self.device_list.delete(item)
 
         # Add devices from database
-        devices = self.device_service.getAllDevices()
+        devices = self.system.getAllDevices()
         for device in devices:
-            self.device_tree.insert("", "end", values=(
+            self.device_list.insert("", "end", values=(
                 device.getName(),
                 device.getLocation(),
                 "On" if device.getStatus() else "Off"
             ))
 
-    pass
-
     def toggle_device(self, turn_on: bool):
-        selected_item = self.device_tree.focus()
+        selected_item = self.device_list.focus()
         if not selected_item:
             messagebox.showerror("Error", "No device selected")
             return
 
-        device_name = self.device_tree.item(selected_item)['values'][0]
-        devices = self.device_service.getAllDevices()
+        device_name = self.device_list.item(selected_item)['values'][0]
 
-        for device in devices:
-            if device.getName() == device_name:
-                if turn_on:
-                    device.turnOn()
-                else:
-                    device.turnOff()
-                break
+        # Update device status in database
+        query = "UPDATE devices SET status = ? WHERE name = ?"
+        params = (turn_on, device_name)
 
-        self.refresh_device_list()
-        pass
+        if self.db.executeQuery(query, params):
+            self.refreshDeviceList()
+        else:
+            messagebox.showerror("Error", "Failed to update device status")
 
 
 if __name__ == "__main__":
