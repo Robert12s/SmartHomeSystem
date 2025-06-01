@@ -9,14 +9,14 @@ class Device:
 
     def turnOn(self):
         self.status = True
-        self.voltage = 10  # Example power usage when on
+        self.voltage = 10
 
     def turnOff(self):
         self.status = False
         self.voltage = 0
 
     def getEnergyUsage(self):
-        return self.voltage * 0.1  # Simple energy calculation
+        return self.voltage * 0.1
 
 
 class Light(Device):

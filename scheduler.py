@@ -20,7 +20,7 @@ class Scheduler:
         currentTime = datetime.now().strftime("%H:%M")
 
         for task in tasks:
-            _, deviceId, action, taskTime, repeat = task
+            taskId, deviceId, action, taskTime, repeat = task
 
             if taskTime == currentTime:
                 device = deviceManager.getDeviceById(deviceId)
