@@ -23,6 +23,7 @@ class Light(Device):
     def __init__(self, id, name, location, status=False, brightness=50):
         super().__init__(id, name, "Light", location, status)
         self.brightness = brightness
+        self.voltage = 5 + (brightness * 0.1)
 
     def setBrightness(self, value):
         self.brightness = max(0, min(100, value))
@@ -33,6 +34,7 @@ class Thermostat(Device):
     def __init__(self, id, name, location, status=False, temperature=22.0):
         super().__init__(id, name, "Thermostat", location, status)
         self.temperature = temperature
+        self.voltage = 15 + abs(22 - temperature)
 
     def setTemperature(self, value):
         self.temperature = max(10.0, min(30.0, value))
@@ -43,6 +45,7 @@ class Alarm(Device):
     def __init__(self, id, name, location, status=False, armed=False):
         super().__init__(id, name, "Alarm", location, status)
         self.armed = armed
+        self.voltage = 2 if armed else 0
 
     def arm(self):
         self.armed = True
@@ -51,7 +54,6 @@ class Alarm(Device):
     def disarm(self):
         self.armed = False
         self.voltage = 0
-
 
 class Task:
     def __init__(self, id, deviceId, action, time, repeat=False):

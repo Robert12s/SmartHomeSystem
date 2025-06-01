@@ -21,13 +21,25 @@ class DeviceManager:
         if not row:
             return None
 
+        # Ensure we have all 9 columns, filling missing ones with defaults
+        row = list(row)
+        while len(row) < 9:  # Add missing columns with default values
+            row.append(None)
+
         id, name, type, loc, status, bright, temp, armed, voltage = row
+
+        # Provide defaults for None values
+        bright = 50 if bright is None else bright
+        temp = 22.0 if temp is None else temp
+        armed = False if armed is None else armed
+        voltage = 0 if voltage is None else voltage
+
         if type == "Light":
-            return Light(id, name, loc, status, bright or 50)
+            return Light(id, name, loc, status, bright)
         elif type == "Thermostat":
-            return Thermostat(id, name, loc, status, temp or 22.0)
+            return Thermostat(id, name, loc, status, temp)
         elif type == "Alarm":
-            return Alarm(id, name, loc, status, armed or False)
+            return Alarm(id, name, loc, status, armed)
         return None
 
     def getAllDevices(self):

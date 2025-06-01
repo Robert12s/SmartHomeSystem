@@ -10,14 +10,21 @@ class Database:
         c = self.conn.cursor()
         c.execute('''CREATE TABLE IF NOT EXISTS devices
                     (id INTEGER PRIMARY KEY, 
-                     name TEXT, type TEXT, location TEXT,
-                     status BOOLEAN, brightness INTEGER,
-                     temperature REAL, armed BOOLEAN)''')
+                     name TEXT, 
+                     type TEXT,
+                     location TEXT,
+                     status BOOLEAN DEFAULT 0,
+                     brightness INTEGER DEFAULT 50,
+                     temperature REAL DEFAULT 22.0,
+                     armed BOOLEAN DEFAULT 0,
+                     voltage REAL DEFAULT 0)''')
 
         c.execute('''CREATE TABLE IF NOT EXISTS tasks
                     (id INTEGER PRIMARY KEY,
-                     deviceId INTEGER, action TEXT,
-                     time TEXT, repeat BOOLEAN)''')
+                     deviceId INTEGER,
+                     action TEXT,
+                     time TEXT,
+                     repeat BOOLEAN DEFAULT 0)''')
         self.conn.commit()
 
     def execute(self, query, params=()):
