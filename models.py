@@ -27,7 +27,7 @@ class Light(Device):
 
     def setBrightness(self, value):
         self.brightness = max(0, min(100, value))
-        self.voltage = 5 + (self.brightness * 0.1)  # Brighter = more energy
+        self.voltage = 5 + (self.brightness * 0.1)
         print(f"Brightness set to {self.brightness}")
 
 class Thermostat(Device):
