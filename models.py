@@ -49,7 +49,7 @@ class Alarm(Device):
 
     def arm(self):
         self.armed = True
-        self.voltage = 2  # Small constant power when armed
+        self.voltage = 2
         print("Alarm armed")
 
     def disarm(self):
